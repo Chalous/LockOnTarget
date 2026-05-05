@@ -331,24 +331,97 @@ void UPreTargetingExtension::UpdateSelection()
 
 	if (SelectedSocket != BestSocket)
 	{
+		const FName OldSocket = SelectedSocket;
 		SelectedSocket = BestSocket;
-		UpdateSelectionVisuals();
+		UpdateSelectionVisuals(OldSocket);
 	}
 }
 
-void UPreTargetingExtension::UpdateSelectionVisuals()
+void UPreTargetingExtension::UpdateSelectionVisuals(FName OldSelectedSocket)
 {
-	for (auto& [Socket, WidgetComp] : PreviewWidgets)
+	if (!SelectedWidgetClass.IsNull())
 	{
-		if (!IsValid(WidgetComp))
+		// 使用不同的 Widget 类区分选中/未选中
+		// 将旧选中的 Socket 切回 PreviewWidgetClass
+		if (OldSelectedSocket != NAME_None && OldSelectedSocket != SelectedSocket)
 		{
-			continue;
+			SetWidgetClassOnSocket(OldSelectedSocket, PreviewWidgetClass);
 		}
 
-		const bool bSelected = (Socket == SelectedSocket);
+		// 将新选中的 Socket 切成 SelectedWidgetClass
+		if (SelectedSocket != NAME_None)
+		{
+			SetWidgetClassOnSocket(SelectedSocket, SelectedWidgetClass);
+		}
+	}
+	else
+	{
+		// 未配置 SelectedWidgetClass，仅用透明度区分
+		for (auto& [Socket, WidgetComp] : PreviewWidgets)
+		{
+			if (!IsValid(WidgetComp))
+			{
+				continue;
+			}
 
-		WidgetComp->SetTintColorAndOpacity(bSelected
-			? FLinearColor::White
-			: FLinearColor(1.f, 1.f, 1.f, DeselectedOpacity));
+			const bool bSelected = (Socket == SelectedSocket);
+			WidgetComp->SetTintColorAndOpacity(bSelected
+				? FLinearColor::White
+				: FLinearColor(1.f, 1.f, 1.f, DeselectedOpacity));
+		}
+	}
+}
+
+void UPreTargetingExtension::SetWidgetClassOnSocket(FName Socket, const TSoftClassPtr<UUserWidget>& WidgetClass)
+{
+	UWidgetComponent* const* Found = PreviewWidgets.Find(Socket);
+	if (!Found || !IsValid(*Found))
+	{
+		return;
+	}
+
+	UWidgetComponent* WidgetComp = *Found;
+
+	if (!WidgetClass.IsNull())
+	{
+		if (UClass* const LoadedClass = WidgetClass.Get())
+		{
+			WidgetComp->SetWidgetClass(LoadedClass);
+		}
+		else if (WidgetClass.IsPending())
+		{
+			UAssetManager::Get().GetStreamableManager().RequestAsyncLoad(
+				WidgetClass.ToSoftObjectPath(),
+				FStreamableDelegate::CreateLambda([WidgetComp, SoftPath = WidgetClass.ToSoftObjectPath()]()
+				{
+					if (IsValid(WidgetComp))
+					{
+						if (UClass* const Class = Cast<UClass>(SoftPath.ResolveObject()))
+						{
+							WidgetComp->SetWidgetClass(Class);
+						}
+					}
+				}));
+		}
+	}
+	else
+	{
+		// 回退到默认或目标自定义控件
+		if (!CachedTargetComponent->CustomWidgetClass.IsNull())
+		{
+			if (UClass* const LoadedClass = CachedTargetComponent->CustomWidgetClass.Get())
+			{
+				WidgetComp->SetWidgetClass(LoadedClass);
+			}
+		}
+		else
+		{
+			static const TSoftClassPtr<UUserWidget> DefaultClass(
+				FSoftClassPath(FString(TEXT("/Script/UMGEditor.WidgetBlueprint'/LockOnTarget/WBP_Target.WBP_Target_C'"))));
+			if (UClass* const LoadedClass = DefaultClass.Get())
+			{
+				WidgetComp->SetWidgetClass(LoadedClass);
+			}
+		}
 	}
 }

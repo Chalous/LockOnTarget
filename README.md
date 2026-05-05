@@ -79,9 +79,10 @@ Source code of the plugin is licensed under MIT license, and other developers ar
 
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
-| `PreviewWidgetClass` | WBP_Target | 预瞄准控件类，为空则复用目标的自定义控件 |
+| `PreviewWidgetClass` | WBP_Target | 未选中时的预瞄准控件类 |
+| `SelectedWidgetClass` | (空) | 视线选中时切换为此控件，为空则用透明度区分 |
 | `SelectionAngleThreshold` | 25° | 视线角度阈值，相机前向与 Socket 方向夹角小于此值视为选中 |
-| `DeselectedOpacity` | 0.4 | 未选中 Widget 的透明度 |
+| `DeselectedOpacity` | 0.4 | 未选中 Widget 的透明度（仅 SelectedWidgetClass 为空时生效） |
 
 ### 使用方式
 

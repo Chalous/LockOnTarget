@@ -31,15 +31,22 @@ public:
 
 public: /** 配置 */
 
-	/** 预瞄准控件的 Widget 类。为空则复用 WidgetExtension 的默认控件。 */
+	/** 预瞄准控件的 Widget 类（未被视线选中时显示）。为空则复用 WidgetExtension 的默认控件。 */
 	UPROPERTY(EditDefaultsOnly, Category = "Pre Targeting")
 	TSoftClassPtr<UUserWidget> PreviewWidgetClass;
+
+	/**
+	 * 确认选中状态的 Widget 类（视线选中时显示）。
+	 * 设置后，选中的 Socket 会切换为此控件；未设置则通过透明度区分选中/未选中。
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Pre Targeting")
+	TSoftClassPtr<UUserWidget> SelectedWidgetClass;
 
 	/** 视线角度阈值（度），相机前向与 Socket 方向的夹角小于此值视为"正在看" */
 	UPROPERTY(EditDefaultsOnly, Category = "Pre Targeting", meta = (ClampMin = 1.f, ClampMax = 90.f, Units = "deg"))
 	float SelectionAngleThreshold;
 
-	/** 未选中 Widget 的透明度 */
+	/** 未选中 Widget 的透明度（仅当 SelectedWidgetClass 为空时生效） */
 	UPROPERTY(EditDefaultsOnly, Category = "Pre Targeting", meta = (ClampMin = 0.f, ClampMax = 1.f))
 	float DeselectedOpacity;
 
@@ -94,7 +101,10 @@ private:
 	void UpdateSelection();
 
 	/** 根据选中状态更新 Widget 外观 */
-	void UpdateSelectionVisuals();
+	void UpdateSelectionVisuals(FName OldSelectedSocket = NAME_None);
+
+	/** 为指定 Socket 设置 Widget 类（处理异步加载） */
+	void SetWidgetClassOnSocket(FName Socket, const TSoftClassPtr<UUserWidget>& WidgetClass);
 
 	bool bIsPreTargeting = false;
 	bool bHadPreviousLock = false;
