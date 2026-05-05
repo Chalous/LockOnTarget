@@ -59,8 +59,10 @@ UGameplayCameraRotationExtension::UGameplayCameraRotationExtension()
 void UGameplayCameraRotationExtension::Initialize(ULockOnTargetComponent* Instigator)
 {
 	Super::Initialize(Instigator);
-	// 不需要像 ControllerRotationExtension 那样绑定 SpringArm 的 Tick 依赖
-	// Gameplay Camera 有自己的 Evaluator 更新顺序
+	// 注意：ControllerRotationExtension 通过 AddPrerequisite 确保在 SpringArm 之前 Tick。
+	// Gameplay Camera 没有 SpringArm，Extension 只更新输出变量，由 Camera Rig 的
+	// Evaluator 在蓝图中读取。如果 Evaluator 在本帧 Extension Tick 之前运行，将产生 1 帧延迟。
+	// TODO: 建立与 Camera Rig Evaluator 的 Tick 依赖关系以消除潜在延迟。
 }
 
 void UGameplayCameraRotationExtension::Deinitialize(ULockOnTargetComponent* Instigator)

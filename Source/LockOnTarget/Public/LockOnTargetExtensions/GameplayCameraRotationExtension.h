@@ -10,20 +10,18 @@ class APlayerCameraManager;
 
 /**
  * 专门为 UE5 Gameplay Camera 系统设计的锁定目标扩展。
+ * 功能等价于 ControllerRotationExtension，但输出处理好的旋转给 Camera Rig 读取，
+ * 而非直接调用 SetControlRotation。
  *
  * 核心职责：
- * 1. 计算平滑、预测后的目标位置
- * 2. 应用角度偏移和限制
- * 3. 执行旋转插值
- * 4. 输出完整的旋转给 Camera Rig 使用
- *
- * 设计理念（方案 A）：
- * - LockOnTarget 只负责计算目标方向，不执行相机行为
- * - 相机行为的插值、限制等由 Camera Rig 的节点处理
- * - 保持关注点分离，提高系统可扩展性
+ * 1. 计算平滑、预测后的目标位置（位置预测 + 临界阻尼弹簧平滑）
+ * 2. 计算目标方向并应用角度偏移和限制
+ * 3. 执行变速旋转插值（Ease-In）
+ * 4. 输出 CalculatedTargetRotation 和 SmoothedTargetLocation 给 Camera Rig 使用
  *
  * 使用方式：
- * 在 Camera Rig 蓝图中读取此扩展的 TargetRotation，通过 Set Rotation 节点控制 Boom Arm。
+ * 在 Camera Rig 蓝图中读取 CalculatedTargetRotation，通过 Set Rotation 节点控制 Boom Arm。
+ * SmoothedTargetLocation 可用于 LookAt 节点或 Auto Rotate Input 2D 的 DirectionVector。
  */
 UCLASS(Blueprintable, HideCategories = Tick)
 class LOCKONTARGET_API UGameplayCameraRotationExtension : public ULockOnTargetExtensionBase
@@ -148,15 +146,15 @@ public:
 	 * 计算目标旋转的核心函数（可被子类覆盖）
 	 *
 	 * 执行流程：
-	 * 1. 获取目标位置
-	 * 2. 应用位置预测和振荡平滑
-	 * 3. 计算目标方向
-	 * 4. 应用角度偏移和限制
-	 * 5. 执行旋转插值
+	 * 1. 获取目标焦点位置
+	 * 2. 应用位置预测（基于相对速度）和振荡平滑（临界阻尼弹簧）
+	 * 3. 死区检测：超出容差时返回上一帧的旋转值
+	 * 4. 计算目标方向并应用 Pitch/Yaw 偏移和限制
+	 * 5. 执行变速旋转插值（小角度慢速，大角度快速），Roll 始终归零
 	 *
-	 * @param CameraManager 相机管理器，用于获取当前相机状态
+	 * @param CameraManager 相机管理器，用于获取当前相机旋转和位置
 	 * @param DeltaTime 帧时间
-	 * @return 最终的目标旋转（已插值）
+	 * @return 最终的目标旋转（已插值、已限制、Roll=0）
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category = "Camera Rotation")
 	FRotator CalcTargetRotation(const APlayerCameraManager* CameraManager, float DeltaTime);
