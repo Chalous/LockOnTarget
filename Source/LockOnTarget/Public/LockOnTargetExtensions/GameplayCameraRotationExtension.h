@@ -103,7 +103,7 @@ public: // 角度限制
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Limits", meta = (ClampMin = -30.f, ClampMax = 30.f, Units = "deg"))
 	float PitchOffset;
 
-	/** Pitch 限制范围（度），[最小值, 最大值] */
+	/** Pitch 限制范围（度），相对于玩家→目标方向的偏移量。X 为向上偏移（负=更向上），Y 为向下偏移（正=更向下） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Limits", meta = (ClampMin = -90.f, ClampMax = 90.f, Units = "deg"))
 	FVector2D PitchClamp;
 
@@ -179,6 +179,9 @@ protected:
 
 	/**
 	 * 计算目标方向的角度（应用偏移和限制）
+	 *
+	 * Yaw：相对于玩家→目标方向的对称限制（±YawClampRange）
+	 * Pitch：相对于玩家→目标方向的偏移限制（+PitchClamp）
 	 *
 	 * @param ViewLocation 观察点位置
 	 * @param TargetLocation 目标位置

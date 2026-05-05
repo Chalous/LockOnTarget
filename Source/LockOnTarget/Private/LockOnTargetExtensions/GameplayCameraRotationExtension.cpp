@@ -252,16 +252,17 @@ FRotator UGameplayCameraRotationExtension::GetTargetRotation(
 			TargetYaw - YawClampRange,
 			TargetYaw + YawClampRange);
 
-		// Pitch 限制：根据当前状态动态调整睡眠容忍度
-		float PitchMinClamped = PitchClamp.X;
-		float PitchMaxClamped = PitchClamp.Y;
+		// Pitch 限制：相对于玩家→目标方向（与 Yaw 保持一致的参照系，目标移动时限制范围跟随移动）
+		const float TargetPitch = FMath::RadiansToDegrees(FMath::Atan2(ToTarget.Z, ToTarget.Size2D()));
+		float PitchMinClamped = TargetPitch + PitchClamp.X;
+		float PitchMaxClamped = TargetPitch + PitchClamp.Y;
 
-		// 如果当前已经超出限制，暂时放宽容忍度避免卡住
-		if (CurrentRotation.Pitch > PitchClamp.Y)
+		// 如果当前已经超出限制，收紧目标边界以产生足够的插值角度差，避免 AngularSleep 跳过修正
+		if (CurrentRotation.Pitch > PitchMaxClamped)
 		{
 			PitchMaxClamped -= AngularSleepTolerance;
 		}
-		else if (CurrentRotation.Pitch < PitchClamp.X)
+		else if (CurrentRotation.Pitch < PitchMinClamped)
 		{
 			PitchMinClamped += AngularSleepTolerance;
 		}
