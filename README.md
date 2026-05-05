@@ -63,4 +63,31 @@ Source code of the plugin is licensed under MIT license, and other developers ar
 <img width="903" height="616" alt="image" src="https://github.com/user-attachments/assets/a9d387ee-38ac-40b0-a6d9-5221d10da12b" />
 
 
+## Pre Targeting Extension
+
+预瞄准扩展提供分步锁定流程，先选定目标身体，展示所有可锁定部位，再确认锁定。
+
+### 蓝图 API
+
+| 方法 | 说明 |
+|------|------|
+| `StartPreTargeting` | 找到视线中的目标，在所有 Socket 上显示预瞄准 UI。已锁定时自动释放镜头。 |
+| `CommitTarget` | 锁定当前高亮的 Socket。 |
+| `CancelPreTargeting` | 取消预瞄准，隐藏 UI。已有锁定时恢复原锁定。 |
+
+### 配置项
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `PreviewWidgetClass` | WBP_Target | 预瞄准控件类，为空则复用目标的自定义控件 |
+| `SelectionAngleThreshold` | 25° | 视线角度阈值，相机前向与 Socket 方向夹角小于此值视为选中 |
+| `DeselectedOpacity` | 0.4 | 未选中 Widget 的透明度 |
+
+### 使用方式
+
+1. 在 LockOnTargetComponent 的 Default Extensions 中添加 PreTargetingExtension
+2. 在蓝图中调用 `StartPreTargeting` 进入预瞄准模式
+3. 移动视角选择部位（自动高亮最近视线的 Socket）
+4. 调用 `CommitTarget` 确认锁定，或 `CancelPreTargeting` 取消
+
 
