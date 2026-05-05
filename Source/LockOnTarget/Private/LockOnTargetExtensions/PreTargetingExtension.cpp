@@ -16,6 +16,7 @@
 UPreTargetingExtension::UPreTargetingExtension()
 	: SelectionAngleThreshold(25.f)
 	, DeselectedOpacity(0.4f)
+	, BodySwitchCooldown(0.3f)
 {
 	ExtensionTick.TickGroup = TG_PostPhysics;
 	ExtensionTick.bCanEverTick = true;
@@ -54,6 +55,39 @@ void UPreTargetingExtension::Update(float DeltaTime)
 	{
 		CancelPreTargeting();
 		return;
+	}
+
+	// 持续检测玩家是否看向了不同的目标身体
+	UTargetComponent* const BestBody = FindBestTargetBody();
+
+	if (BestBody && BestBody != CachedTargetComponent)
+	{
+		// 使用冷却时间避免视线在目标边界来回切换时抖动
+		if (BestBody != PendingSwitchTarget)
+		{
+			PendingSwitchTarget = BestBody;
+			BodySwitchAccumulator = 0.f;
+		}
+
+		BodySwitchAccumulator += DeltaTime;
+
+		if (BodySwitchAccumulator >= BodySwitchCooldown)
+		{
+			DestroyPreviewWidgets();
+			CachedTargetComponent = BestBody;
+			PendingSwitchTarget = nullptr;
+			BodySwitchAccumulator = 0.f;
+			SelectedSocket = NAME_None;
+
+			CreatePreviewWidgets();
+			UpdateSelection();
+			UpdateSelectionVisuals();
+		}
+	}
+	else
+	{
+		PendingSwitchTarget = nullptr;
+		BodySwitchAccumulator = 0.f;
 	}
 
 	UpdateSelection();
@@ -95,6 +129,8 @@ void UPreTargetingExtension::StartPreTargeting()
 
 	CreatePreviewWidgets();
 	bIsPreTargeting = true;
+	PendingSwitchTarget = nullptr;
+	BodySwitchAccumulator = 0.f;
 	SetTickEnabled(true);
 	UpdateSelection();
 	UpdateSelectionVisuals();

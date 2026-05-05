@@ -83,6 +83,7 @@ Source code of the plugin is licensed under MIT license, and other developers ar
 | `SelectedWidgetClass` | (空) | 视线选中时切换为此控件，为空则用透明度区分 |
 | `SelectionAngleThreshold` | 25° | 视线角度阈值，相机前向与 Socket 方向夹角小于此值视为选中 |
 | `DeselectedOpacity` | 0.4 | 未选中 Widget 的透明度（仅 SelectedWidgetClass 为空时生效） |
+| `BodySwitchCooldown` | 0.3s | 切换到新目标身体前的冷却时间，防止视线在目标边界抖动 |
 
 ### 使用方式
 

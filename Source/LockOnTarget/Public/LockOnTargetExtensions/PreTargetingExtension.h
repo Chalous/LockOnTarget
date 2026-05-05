@@ -50,6 +50,10 @@ public: /** 配置 */
 	UPROPERTY(EditDefaultsOnly, Category = "Pre Targeting", meta = (ClampMin = 0.f, ClampMax = 1.f))
 	float DeselectedOpacity;
 
+	/** 切换到新目标身体前的冷却时间（秒），防止视线在目标边界来回切换时抖动。0 = 立即切换 */
+	UPROPERTY(EditDefaultsOnly, Category = "Pre Targeting", meta = (ClampMin = 0.f, ClampMax = 2.f, Units = "s"))
+	float BodySwitchCooldown;
+
 public: /** 蓝图 API */
 
 	/** 开始预瞄准：找到视线中的目标，在其所有 Socket 上显示预瞄准 UI */
@@ -110,6 +114,8 @@ private:
 	bool bHadPreviousLock = false;
 	FTargetInfo CachedPreviousLock;
 	TObjectPtr<UTargetComponent> CachedTargetComponent = nullptr;
+	TObjectPtr<UTargetComponent> PendingSwitchTarget = nullptr;
+	float BodySwitchAccumulator = 0.f;
 	FName SelectedSocket = NAME_None;
 	TMap<FName, UWidgetComponent*> PreviewWidgets;
 };
