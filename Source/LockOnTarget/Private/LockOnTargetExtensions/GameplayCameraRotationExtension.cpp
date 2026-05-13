@@ -30,8 +30,22 @@ static FVector VInterpCriticallyDamped(const FVector& Current, const FVector& Ta
 	return Current + InOutVelocity * DeltaTime;
 }
 
+static FVector2D GetSortedRange(const FVector2D& Range)
+{
+	return FVector2D(FMath::Min(Range.X, Range.Y), FMath::Max(Range.X, Range.Y));
+}
+
+static FVector2D GetClampedNormalizedRange(const FVector2D& Range)
+{
+	const FVector2D SortedRange = GetSortedRange(Range);
+	return FVector2D(
+		FMath::Clamp(SortedRange.X, -0.95f, 0.95f),
+		FMath::Clamp(SortedRange.Y, -0.95f, 0.95f));
+}
+
 UGameplayCameraRotationExtension::UGameplayCameraRotationExtension()
-	: bBlockLookInput(true)
+	: CurrentLockOnCorrectionStrength(1.f)
+	, bBlockLookInput(true)
 	, bUseLocationPrediction(true)
 	, PredictionTime(0.083f)
 	, MaxAngularDeviation(10.f)
@@ -42,11 +56,19 @@ UGameplayCameraRotationExtension::UGameplayCameraRotationExtension()
 	, YawClampRange(35.f)
 	, PitchOffset(-10.f)
 	, PitchClamp(-50.f, 30.f)
+	, bUseScreenSpaceFraming(true)
+	, ScreenFramingOffset(0.f, 0.f)
+	, ScreenFramingHorizontalRange(-0.55f, 0.55f)
+	, ScreenFramingVerticalRange(-0.35f, 0.35f)
+	, FallbackAspectRatio(16.f / 9.f)
+	, DefaultLockOnCorrectionStrength(1.f)
 	, InterpolationSpeed(12.5f)
 	, AngularSleepTolerance(4.75f)
 	, InterpEasingRange(10.f)
 	, InterpEasingExponent(1.25f)
 	, MinInterpSpeed(0.65f)
+	, TargetLockOnCorrectionStrength(1.f)
+	, LockOnCorrectionStrengthBlendSpeed(0.f)
 	, SpringVelocity(0.f)
 {
 	// 在物理后 Tick，确保使用最新的物理状态
@@ -59,6 +81,8 @@ UGameplayCameraRotationExtension::UGameplayCameraRotationExtension()
 void UGameplayCameraRotationExtension::Initialize(ULockOnTargetComponent* Instigator)
 {
 	Super::Initialize(Instigator);
+	ResetLockOnCorrectionStrength(0.f);
+
 	// 注意：ControllerRotationExtension 通过 AddPrerequisite 确保在 SpringArm 之前 Tick。
 	// Gameplay Camera 没有 SpringArm，Extension 只更新输出变量，由 Camera Rig 的
 	// Evaluator 在蓝图中读取。如果 Evaluator 在本帧 Extension Tick 之前运行，将产生 1 帧延迟。
@@ -90,6 +114,7 @@ void UGameplayCameraRotationExtension::OnTargetUnlocked(UTargetComponent* Unlock
 	Super::OnTargetUnlocked(UnlockedTarget, Socket);
 	SetTickEnabled(false);
 	ResetSpringInterpData();
+	ResetLockOnCorrectionStrength(0.f);
 
 	if (APlayerController* const PC = GetPlayerController())
 	{
@@ -120,8 +145,30 @@ void UGameplayCameraRotationExtension::ResetSpringInterpData()
 	SpringVelocity = FVector::ZeroVector;
 }
 
+void UGameplayCameraRotationExtension::SetLockOnCorrectionStrength(float NewStrength, float BlendTime)
+{
+	TargetLockOnCorrectionStrength = FMath::Clamp(NewStrength, 0.f, 1.f);
+
+	if (BlendTime <= 0.f)
+	{
+		CurrentLockOnCorrectionStrength = TargetLockOnCorrectionStrength;
+		LockOnCorrectionStrengthBlendSpeed = 0.f;
+		return;
+	}
+
+	const float Delta = FMath::Abs(TargetLockOnCorrectionStrength - CurrentLockOnCorrectionStrength);
+	LockOnCorrectionStrengthBlendSpeed = Delta > KINDA_SMALL_NUMBER ? Delta / BlendTime : 0.f;
+}
+
+void UGameplayCameraRotationExtension::ResetLockOnCorrectionStrength(float BlendTime)
+{
+	SetLockOnCorrectionStrength(DefaultLockOnCorrectionStrength, BlendTime);
+}
+
 void UGameplayCameraRotationExtension::Update(float DeltaTime)
 {
+	UpdateCorrectionStrength(DeltaTime);
+
 	if (GetLockOnTargetComponent()->IsTargetLocked())
 	{
 		APlayerController* const PC = GetPlayerController();
@@ -164,8 +211,8 @@ FRotator UGameplayCameraRotationExtension::CalcTargetRotation_Implementation(
 
 		if (Distance2D < CollisionRadius || FMath::Abs(ToTargetPitch) > DeadZoneMaxPitch)
 		{
-			// 不更新输出，保持当前值
-			return CalculatedTargetRotation;
+			// 与 ControllerRotationExtension 一致：死区内保持当前相机旋转。
+			return CurrentRotation;
 		}
 	}
 
@@ -174,9 +221,17 @@ FRotator UGameplayCameraRotationExtension::CalcTargetRotation_Implementation(
 
 	// 7. 计算目标方向（使用相机实际位置作为观察点）
 	const FVector ViewLocation = CameraManager->GetCameraLocation();
-	FRotator OutRotation = GetTargetRotation(ViewLocation, TargetLocation, CurrentRotation);
+	FRotator OutRotation = bUseScreenSpaceFraming
+		? GetScreenSpaceTargetRotation(
+			ViewLocation,
+			TargetLocation,
+			CurrentRotation,
+			CameraManager->GetFOVAngle(),
+			GetCameraAspectRatio(CameraManager))
+		: GetTargetRotation(ViewLocation, TargetLocation, CurrentRotation);
 
 	// 8. 执行旋转插值
+	OutRotation = ApplyCorrectionStrength(OutRotation, CurrentRotation);
 	OutRotation = InterpTargetRotation(OutRotation, CurrentRotation, DeltaTime);
 
 	return OutRotation;
@@ -231,6 +286,48 @@ FVector UGameplayCameraRotationExtension::GetCorrectedTargetLocation(
 	return OutLocation;
 }
 
+FRotator UGameplayCameraRotationExtension::GetScreenSpaceTargetRotation(
+	const FVector& ViewLocation, const FVector& InTargetLocation, const FRotator& CurrentRotation,
+	float HorizontalFOV, float AspectRatio)
+{
+	const FVector LocalTarget = CurrentRotation.UnrotateVector(InTargetLocation - ViewLocation);
+	if (LocalTarget.IsNearlyZero())
+	{
+		return CurrentRotation;
+	}
+
+	const float HalfHorizontalFOV = FMath::DegreesToRadians(FMath::Clamp(HorizontalFOV, 5.f, 170.f) * 0.5f);
+	const float HalfVerticalFOV = FMath::Atan(FMath::Tan(HalfHorizontalFOV) / FMath::Max(AspectRatio, 0.1f));
+
+	// YawOffset/PitchOffset 在屏幕构图模式下被解释为锁定点的屏幕位置偏移。
+	const float NormalizedYawOffset = -FMath::DegreesToRadians(YawOffset) / HalfHorizontalFOV;
+	const float NormalizedPitchOffset = -FMath::DegreesToRadians(PitchOffset) / HalfVerticalFOV;
+
+	const float HorizontalOffset = ScreenFramingOffset.X + NormalizedYawOffset;
+	const float VerticalOffset = ScreenFramingOffset.Y + NormalizedPitchOffset;
+	const FVector2D HorizontalRange = GetClampedNormalizedRange(
+		ScreenFramingHorizontalRange + FVector2D(HorizontalOffset, HorizontalOffset));
+	const FVector2D VerticalRange = GetClampedNormalizedRange(
+		ScreenFramingVerticalRange + FVector2D(VerticalOffset, VerticalOffset));
+
+	const float CurrentTargetYaw = FMath::Atan2(LocalTarget.Y, LocalTarget.X);
+	const float CurrentTargetPitch = FMath::Atan2(LocalTarget.Z, LocalTarget.X);
+
+	const float MinYaw = HorizontalRange.X * HalfHorizontalFOV;
+	const float MaxYaw = HorizontalRange.Y * HalfHorizontalFOV;
+	const float MinPitch = VerticalRange.X * HalfVerticalFOV;
+	const float MaxPitch = VerticalRange.Y * HalfVerticalFOV;
+
+	const float FramedTargetYaw = FMath::Clamp(CurrentTargetYaw, MinYaw, MaxYaw);
+	const float FramedTargetPitch = FMath::Clamp(CurrentTargetPitch, MinPitch, MaxPitch);
+
+	FRotator OutRotation = CurrentRotation;
+	OutRotation.Yaw += FMath::RadiansToDegrees(CurrentTargetYaw - FramedTargetYaw);
+	OutRotation.Pitch += FMath::RadiansToDegrees(CurrentTargetPitch - FramedTargetPitch);
+
+	return ApplyRotationLimits(OutRotation, InTargetLocation, CurrentRotation);
+}
+
 FRotator UGameplayCameraRotationExtension::GetTargetRotation(
 	const FVector& ViewLocation, const FVector& InTargetLocation, const FRotator& CurrentRotation)
 {
@@ -241,7 +338,15 @@ FRotator UGameplayCameraRotationExtension::GetTargetRotation(
 	OutRotation.Pitch += PitchOffset;
 	OutRotation.Yaw += YawOffset;
 
-	// 3. 应用角度限制
+	return ApplyRotationLimits(OutRotation, InTargetLocation, CurrentRotation);
+}
+
+FRotator UGameplayCameraRotationExtension::ApplyRotationLimits(
+	const FRotator& TargetRotation, const FVector& InTargetLocation, const FRotator& CurrentRotation)
+{
+	FRotator OutRotation = TargetRotation;
+
+	// 应用与 ControllerRotationExtension 一致的角度限制
 	{
 		// Yaw 限制：相对于目标方向对称限制
 		const FVector Pivot = GetLockOnTargetComponent()->GetOwner()->GetActorLocation();
@@ -252,17 +357,16 @@ FRotator UGameplayCameraRotationExtension::GetTargetRotation(
 			TargetYaw - YawClampRange,
 			TargetYaw + YawClampRange);
 
-		// Pitch 限制：相对于玩家→目标方向（与 Yaw 保持一致的参照系，目标移动时限制范围跟随移动）
-		const float TargetPitch = FMath::RadiansToDegrees(FMath::Atan2(ToTarget.Z, ToTarget.Size2D()));
-		float PitchMinClamped = TargetPitch + PitchClamp.X;
-		float PitchMaxClamped = TargetPitch + PitchClamp.Y;
+		// Pitch 限制：与 ControllerRotationExtension 一致，使用固定 PitchClamp 范围。
+		float PitchMinClamped = PitchClamp.X;
+		float PitchMaxClamped = PitchClamp.Y;
 
 		// 如果当前已经超出限制，收紧目标边界以产生足够的插值角度差，避免 AngularSleep 跳过修正
-		if (CurrentRotation.Pitch > PitchMaxClamped)
+		if (CurrentRotation.Pitch > PitchClamp.Y)
 		{
 			PitchMaxClamped -= AngularSleepTolerance;
 		}
-		else if (CurrentRotation.Pitch < PitchMinClamped)
+		else if (CurrentRotation.Pitch < PitchClamp.X)
 		{
 			PitchMinClamped += AngularSleepTolerance;
 		}
@@ -271,6 +375,62 @@ FRotator UGameplayCameraRotationExtension::GetTargetRotation(
 	}
 
 	return OutRotation;
+}
+
+float UGameplayCameraRotationExtension::GetCameraAspectRatio(const APlayerCameraManager* CameraManager) const
+{
+	if (CameraManager)
+	{
+		if (APlayerController* const PC = CameraManager->GetOwningPlayerController())
+		{
+			int32 SizeX = 0;
+			int32 SizeY = 0;
+			PC->GetViewportSize(SizeX, SizeY);
+			if (SizeX > 0 && SizeY > 0)
+			{
+				return static_cast<float>(SizeX) / static_cast<float>(SizeY);
+			}
+		}
+	}
+
+	return FMath::Max(FallbackAspectRatio, 0.1f);
+}
+
+FRotator UGameplayCameraRotationExtension::ApplyCorrectionStrength(
+	const FRotator& TargetRotation, const FRotator& CurrentRotation) const
+{
+	const float Strength = FMath::Clamp(CurrentLockOnCorrectionStrength, 0.f, 1.f);
+	if (Strength <= KINDA_SMALL_NUMBER)
+	{
+		return CurrentRotation;
+	}
+
+	if (Strength >= 1.f - KINDA_SMALL_NUMBER)
+	{
+		return TargetRotation;
+	}
+
+	return FQuat::Slerp(CurrentRotation.Quaternion(), TargetRotation.Quaternion(), Strength).Rotator();
+}
+
+void UGameplayCameraRotationExtension::UpdateCorrectionStrength(float DeltaTime)
+{
+	if (LockOnCorrectionStrengthBlendSpeed <= 0.f)
+	{
+		return;
+	}
+
+	CurrentLockOnCorrectionStrength = FMath::FInterpConstantTo(
+		CurrentLockOnCorrectionStrength,
+		TargetLockOnCorrectionStrength,
+		DeltaTime,
+		LockOnCorrectionStrengthBlendSpeed);
+
+	if (FMath::IsNearlyEqual(CurrentLockOnCorrectionStrength, TargetLockOnCorrectionStrength, KINDA_SMALL_NUMBER))
+	{
+		CurrentLockOnCorrectionStrength = TargetLockOnCorrectionStrength;
+		LockOnCorrectionStrengthBlendSpeed = 0.f;
+	}
 }
 
 FRotator UGameplayCameraRotationExtension::InterpTargetRotation(

@@ -134,6 +134,39 @@ FindTarget 调用
 
 为了适配Gameplay Camera，创建了一个Gameplay Camera Rotation Extension，用于替代Controller Rotation Extension。里面的Calculated Target Rotation和Smoothed Target Location用于平滑Gameplay Camera的旋转。
 
+### Screen Space Framing
+
+Gameplay Camera Rotation Extension 默认启用屏幕空间构图。它不再每帧强制相机 LookAt 锁定点，而是检测锁定点在视口中的位置，只在锁定点离开安全框时修正旋转。这样可以减少高低差目标导致的奇怪俯仰角，也能让锁定点更稳定地保持在视口内。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `bUseScreenSpaceFraming` | true | 启用屏幕空间构图。关闭后回退到原始 LookAt 旋转。 |
+| `ScreenFramingOffset` | (0, 0) | 锁定点在屏幕中的构图偏移。X 右为正，Y 上为正。 |
+| `ScreenFramingHorizontalRange` | (-0.55, 0.55) | 横向安全范围。锁定点在范围内时不主动修正 Yaw。 |
+| `ScreenFramingVerticalRange` | (-0.35, 0.35) | 纵向安全范围。锁定点在范围内时不主动修正 Pitch。 |
+| `FallbackAspectRatio` | 16:9 | 无法读取 Viewport 比例时使用的宽高比。 |
+
+`YawOffset` 和 `PitchOffset` 在屏幕构图模式下会被解释为锁定点的构图偏移，而不是直接把相机旋转固定偏移。`YawClampRange`、`PitchClamp` 和死区逻辑仍然与 Controller Rotation Extension 保持一致。
+
+### Correction Strength
+
+当攻击、处决、受击等 Camera Rig 需要临时接管镜头时，可以降低锁定旋转修正强度，避免 LockOn 修正和 Attack Rig Offset 互相拉扯。
+
+| 蓝图函数 | 说明 |
+|------|------|
+| `SetLockOnCorrectionStrength(NewStrength, BlendTime)` | 设置锁定旋转修正强度。0 表示不修正，1 表示完整修正。 |
+| `ResetLockOnCorrectionStrength(BlendTime)` | 恢复到 `DefaultLockOnCorrectionStrength`。 |
+
+推荐用法：
+
+```
+Attack Rig 开始:
+SetLockOnCorrectionStrength(0.25, 0.08)
+
+Attack Rig 结束:
+ResetLockOnCorrectionStrength(0.12)
+```
+
 ## Usage
 1. 拓展使用
 <img width="528" height="189" alt="image" src="https://github.com/user-attachments/assets/d492bc58-6153-45f2-813b-733cacdae553" />
