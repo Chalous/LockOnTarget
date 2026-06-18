@@ -9,6 +9,36 @@
 class UTargetComponent;
 
 /**
+ * Represents socket data with optional metadata for external use.
+ * Each socket can be marked as the main lock-on target and assigned a weight.
+ */
+USTRUCT(BlueprintType)
+struct LOCKONTARGET_API FTargetSocketData
+{
+	GENERATED_BODY()
+
+	FTargetSocketData() = default;
+
+	FTargetSocketData(FName InSocket, bool bInIsMainSocket = false, float InWeight = 0.5f)
+		: Socket(InSocket)
+		, bIsMainSocket(bInIsMainSocket)
+		, Weight(InWeight)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Socket")
+	FName Socket = NAME_None;
+
+	/** Whether this socket is the primary lock-on target. For external use. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Socket")
+	bool bIsMainSocket = false;
+
+	/** Weight of this socket for target selection (0-1). For external use. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Socket", meta = (ClampMin = 0.f, ClampMax = 1.f))
+	float Weight = 0.5f;
+};
+
+/**
  * Holds information related to the Target.
  */
 USTRUCT(BlueprintType)

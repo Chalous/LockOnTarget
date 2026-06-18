@@ -60,9 +60,9 @@ private: /** General */
 	UPROPERTY(EditAnywhere, Category = "General")
 	FName AssociatedComponentName;
 
-	/** Sockets to capture. Add/RemoveSocket(). */
+	/** Sockets to capture with optional metadata. Add/RemoveSocket(). */
 	UPROPERTY(EditAnywhere, Category = "General", meta = (EditFixedOrder, DisplayName = "Sockets Data", NoResetToDefault))
-	TArray<FName> Sockets;
+	TArray<FTargetSocketData> Sockets;
 
 public: /** General */
 
@@ -165,11 +165,11 @@ public: /** Sockets */
 
 	/** Does the given Socket exist in the Target. */
 	UFUNCTION(BlueprintPure, Category = "Target")
-	bool IsSocketValid(FName Socket) const { return Sockets.Contains(Socket); };
+	bool IsSocketValid(FName Socket) const;
 
-	/** Returns all available Sockets. */
+	/** Returns all available Socket data. */
 	UFUNCTION(BlueprintPure, Category = "Target")
-	const TArray<FName>& GetSockets() const { return Sockets; }
+	const TArray<FTargetSocketData>& GetSockets() const { return Sockets; }
 
 	/** Returns the world location of the given Socket. */
 	UFUNCTION(BlueprintPure, Category = "Target")
@@ -180,8 +180,8 @@ public: /** Sockets */
 	void SetDefaultSocket(FName Socket = NAME_None);
 
 	/** Updates the default Socket in 0 index. */
-	UFUNCTION(BlueprintCallable, Category = "Target", meta = (AutoCreateRefTerm = "Socket"))
-	FName GetDefaultSocket() const { return Sockets.IsEmpty() ? NAME_None : Sockets[0]; }
+	UFUNCTION(BlueprintPure, Category = "Target")
+	FName GetDefaultSocket() const { return Sockets.IsEmpty() ? NAME_None : Sockets[0].Socket; }
 
 	/** Adds a Socket at runtime. */
 	UFUNCTION(BlueprintCallable, Category = "Target", meta = (AutoCreateRefTerm = "Socket"))

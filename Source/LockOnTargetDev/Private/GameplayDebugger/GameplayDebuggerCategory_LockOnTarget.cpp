@@ -172,8 +172,9 @@ FString FGameplayDebuggerCategory_LockOnTarget::CollectTargetSocketsInfo(const U
 
 	if (InLockOn->IsTargetLocked())
 	{
-		for (const FName Socket : InLockOn->GetTargetComponent()->GetSockets())
+		for (const FTargetSocketData& SocketData : InLockOn->GetTargetComponent()->GetSockets())
 		{
+			const FName& Socket = SocketData.Socket;
 			if (Socket == InLockOn->GetCapturedSocket())
 			{
 				Info += FString::Printf(TEXT("{yellow}%s{white}, "), *Socket.ToString());

@@ -178,6 +178,63 @@ ResetLockOnCorrectionStrength(0.12)
 <img width="903" height="616" alt="image" src="https://github.com/user-attachments/assets/a9d387ee-38ac-40b0-a6d9-5221d10da12b" />
 
 
+## Target Socket Data 扩展
+
+`FTargetSocketData` 结构体扩展了 `UTargetComponent::Sockets`，从原来的 `TArray<FName>` 升级为结构体数组，支持每个骨骼携带额外元数据。
+
+### 结构体定义
+
+```cpp
+USTRUCT(BlueprintType)
+struct FTargetSocketData
+{
+    FName Socket = NAME_None;       // 骨骼名称
+    bool bIsMainSocket = false;     // 是否为主要锁定部位
+    float Weight = 0.5f;            // 骨骼权重 (0-1)
+};
+```
+
+### 字段说明
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `Socket` | FName | None | 骨骼/Socket 名称（原有功能，编辑器中有下拉选择器） |
+| `bIsMainSocket` | bool | false | 标识该骨骼是否为角色的主要锁定部位，供外部逻辑使用 |
+| `Weight` | float (0-1) | 0.5 | 该骨骼在目标选择中的权重，供外部逻辑使用 |
+
+### API
+
+`TargetComponent` 原有的 Socket 方法接口保持不变：
+
+| 方法 | 说明 |
+|------|------|
+| `GetSockets()` | 返回 `const TArray<FTargetSocketData>&`，包含完整的结构体数据 |
+| `GetDefaultSocket()` | 返回索引 0 的 `Socket` 字段值 |
+| `AddSocket(FName)` | 新增骨骼（新字段使用默认值） |
+| `RemoveSocket(FName)` | 移除骨骼 |
+| `IsSocketValid(FName)` | 检查骨骼是否存在 |
+| `SetDefaultSocket(FName)` | 设为默认骨骼（已存在则移至索引 0，保留其元数据） |
+
+### 使用示例
+
+在蓝图或 C++ 中读取：
+
+```cpp
+for (const FTargetSocketData& Data : Target->GetSockets())
+{
+    if (Data.bIsMainSocket)
+    {
+        // 这是主要锁定部位
+        FVector Loc = Target->GetSocketLocation(Data.Socket);
+    }
+    
+    // 根据 Weight 调整选择优先级
+    float Priority = Data.Weight;
+}
+```
+
+---
+
 ## Pre Targeting Extension
 
 预瞄准扩展提供分步锁定流程，先选定目标身体，展示所有可锁定部位，再确认锁定。

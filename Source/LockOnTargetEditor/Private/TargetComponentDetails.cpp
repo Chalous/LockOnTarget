@@ -261,16 +261,32 @@ void FTargetComponentDetails::GenerateArrayElementWidget(TSharedRef<IPropertyHan
 {
 	if (PropertyHandle->IsValidHandle())
 	{
-		ChildrenBuilder.AddProperty(PropertyHandle).CustomWidget()
-			.NameContent()
-			[
-				PropertyHandle->CreatePropertyNameWidget()
-			]
-			.ValueContent()
-			[
-				SNew(SSocketSelector)
-				.PropertyHandle(PropertyHandle)
-				.SceneComponent(this, &FTargetComponentDetails::GetAssociatedComponent)
-			];
+		// Socket — use SSocketSelector for dropdown selection from the skeletal mesh
+		if (TSharedPtr<IPropertyHandle> SocketPropertyHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FTargetSocketData, Socket)))
+		{
+			ChildrenBuilder.AddProperty(SocketPropertyHandle.ToSharedRef()).CustomWidget()
+				.NameContent()
+				[
+					SocketPropertyHandle->CreatePropertyNameWidget()
+				]
+				.ValueContent()
+				[
+					SNew(SSocketSelector)
+					.PropertyHandle(SocketPropertyHandle)
+					.SceneComponent(this, &FTargetComponentDetails::GetAssociatedComponent)
+				];
+		}
+
+		// bIsMainSocket — standard bool checkbox
+		if (TSharedPtr<IPropertyHandle> bIsMainSocketPropertyHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FTargetSocketData, bIsMainSocket)))
+		{
+			ChildrenBuilder.AddProperty(bIsMainSocketPropertyHandle.ToSharedRef());
+		}
+
+		// Weight — standard float slider (0-1)
+		if (TSharedPtr<IPropertyHandle> WeightPropertyHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FTargetSocketData, Weight)))
+		{
+			ChildrenBuilder.AddProperty(WeightPropertyHandle.ToSharedRef());
+		}
 	}
 }

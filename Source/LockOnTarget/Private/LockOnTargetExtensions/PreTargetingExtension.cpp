@@ -239,7 +239,7 @@ void UPreTargetingExtension::CreatePreviewWidgets()
 {
 	DestroyPreviewWidgets();
 
-	const TArray<FName>& Sockets = CachedTargetComponent->GetSockets();
+	const TArray<FTargetSocketData>& Sockets = CachedTargetComponent->GetSockets();
 	USceneComponent* const AttachParent = CachedTargetComponent->GetAssociatedComponent();
 
 	if (!AttachParent)
@@ -247,8 +247,9 @@ void UPreTargetingExtension::CreatePreviewWidgets()
 		return;
 	}
 
-	for (const FName& Socket : Sockets)
+	for (const FTargetSocketData& SocketData : Sockets)
 	{
+		const FName& Socket = SocketData.Socket;
 		const FName WidgetName = MakeUniqueObjectName(this, UWidgetComponent::StaticClass(),
 			*FString::Printf(TEXT("PreTarget_Preview_%s"), *Socket.ToString()));
 

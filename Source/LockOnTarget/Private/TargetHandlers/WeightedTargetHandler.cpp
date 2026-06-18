@@ -160,9 +160,9 @@ void UWeightedTargetHandler::PerformPrimarySamplingPass(FFindTargetContext& Cont
 			continue;
 		}
 
-		for (const FName TargetSocket : Target->GetSockets())
+		for (const FTargetSocketData& TargetSocketData : Target->GetSockets())
 		{
-			const FTargetInfo CurrentTarget = { Target, TargetSocket };
+			const FTargetInfo CurrentTarget = { Target, TargetSocketData.Socket };
 
 			//Skip already captured Target and Socket.
 			if (Context.CapturedTarget.Target == CurrentTarget)

@@ -72,11 +72,11 @@ bool FTargetInfo::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess
 			//If the Target is mapped and TargetComponent is found, we can find the actual Socket.
 			if (IsValid(TargetComponent))
 			{
-				const TArray<FName>& Sockets = TargetComponent->GetSockets();
+				const TArray<FTargetSocketData>& Sockets = TargetComponent->GetSockets();
 
 				if (ensureMsgf(Sockets.IsValidIndex(SocketIdx), TEXT("An invalid Socket index was received from NetSerialize.")))
 				{
-					Socket = Sockets[SocketIdx];
+					Socket = Sockets[SocketIdx].Socket;
 				}
 				else
 				{
@@ -101,7 +101,8 @@ uint32 FTargetInfo::GetSocketIndex() const
 
 	if (IsValid(TargetComponent))
 	{
-		if(int32 FoundIdx = TargetComponent->GetSockets().IndexOfByKey(Socket); FoundIdx != INDEX_NONE)
+		const TArray<FTargetSocketData>& Sockets = TargetComponent->GetSockets();
+		if (int32 FoundIdx = Sockets.IndexOfByPredicate([this](const FTargetSocketData& Data) { return Data.Socket == Socket; }); FoundIdx != INDEX_NONE)
 		{
 			Index = FoundIdx;
 		}

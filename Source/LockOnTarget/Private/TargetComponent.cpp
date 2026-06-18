@@ -23,7 +23,7 @@ UTargetComponent::UTargetComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
 	bWantsInitializeComponent = true;
-	Sockets.Add(NAME_None);
+	Sockets.Add(FTargetSocketData(NAME_None));
 }
 
 UTargetManager& UTargetComponent::GetTargetManager() const
@@ -137,6 +137,11 @@ void UTargetComponent::DispatchTargetException(ETargetExceptionType Exception)
 	}
 }
 
+bool UTargetComponent::IsSocketValid(FName Socket) const
+{
+	return Sockets.ContainsByPredicate([Socket](const FTargetSocketData& Data) { return Data.Socket == Socket; });
+}
+
 FVector UTargetComponent::GetSocketLocation(FName Socket) const
 {
 	return AssociatedComponent.IsValid() ? AssociatedComponent->GetSocketLocation(Socket) : GetOwner()->GetActorLocation();
@@ -144,40 +149,52 @@ FVector UTargetComponent::GetSocketLocation(FName Socket) const
 
 void UTargetComponent::SetDefaultSocket(FName Socket)
 {
+	// Check if the Socket already exists in the array
+	const int32 ExistingIdx = Sockets.IndexOfByPredicate([Socket](const FTargetSocketData& Data) { return Data.Socket == Socket; });
+
 	if (Sockets.IsEmpty())
 	{
-		Sockets.Add(Socket);
+		Sockets.Add(FTargetSocketData(Socket));
 	}
-	else if (Sockets[0] != Socket)
+	else if (ExistingIdx == INDEX_NONE)
 	{
-		Sockets[0] = Socket;
-
+		// Socket doesn't exist yet — add at front
+		Sockets.Insert(FTargetSocketData(Socket), 0);
 		DispatchTargetException(ETargetExceptionType::SocketInvalidation);
 	}
+	else if (ExistingIdx != 0)
+	{
+		// Move existing socket to index 0
+		FTargetSocketData Data = Sockets[ExistingIdx];
+		Sockets.RemoveAtSwap(ExistingIdx, 1, false);
+		Sockets.Insert(MoveTemp(Data), 0);
+		DispatchTargetException(ETargetExceptionType::SocketInvalidation);
+	}
+	// else: already at index 0, nothing to do
 }
 
 bool UTargetComponent::AddSocket(FName Socket)
 {
-	const bool bIsSuccessful = !Sockets.Contains(Socket);
+	const bool bAlreadyExists = Sockets.ContainsByPredicate([Socket](const FTargetSocketData& Data) { return Data.Socket == Socket; });
 
-	if (bIsSuccessful)
+	if (!bAlreadyExists)
 	{
-		Sockets.Add(Socket);
+		Sockets.Add(FTargetSocketData(Socket));
 	}
 
-	return bIsSuccessful;
+	return !bAlreadyExists;
 }
 
 bool UTargetComponent::RemoveSocket(FName Socket)
 {
-	const bool bIsSuccessful = Sockets.RemoveSingleSwap(Socket, false) > 0;
+	const int32 RemovedCount = Sockets.RemoveAllSwap([Socket](const FTargetSocketData& Data) { return Data.Socket == Socket; }, false);
 
-	if (bIsSuccessful)
+	if (RemovedCount > 0)
 	{
 		DispatchTargetException(ETargetExceptionType::SocketInvalidation);
 	}
 
-	return bIsSuccessful;
+	return RemovedCount > 0;
 }
 
 FVector UTargetComponent::GetFocusPointLocation(const ULockOnTargetComponent* Instigator) const
