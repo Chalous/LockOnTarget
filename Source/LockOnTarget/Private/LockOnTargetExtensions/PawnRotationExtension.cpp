@@ -51,7 +51,7 @@ void UPawnRotationExtension::OnTargetUnlocked(UTargetComponent* Target, FName So
 
 void UPawnRotationExtension::Update(float DeltaTime)
 {
-	if (GetLockOnTargetComponent()->IsTargetLocked())
+	if (GetLockOnTargetComponent()->IsTargetLocked() && !bPaused)
 	{
 		UPawnMovementComponent* const MovementComponent = GetMovementComponent();
 
@@ -84,6 +84,11 @@ UPawnMovementComponent* UPawnRotationExtension::GetMovementComponent() const
 	}
 
 	return MovementComponent;
+}
+
+void UPawnRotationExtension::SetPaused(bool bInPaused)
+{
+	bPaused = bInPaused;
 }
 
 float UPawnRotationExtension::GetDeltaYaw(float DeltaTime)

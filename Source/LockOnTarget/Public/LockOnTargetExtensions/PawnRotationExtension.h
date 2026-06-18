@@ -24,11 +24,22 @@ public:
 	/** Change in rotation per second. Set a negative value for infinite rotation rate and instant turns. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rotation")
 	float RotationRate;
-	
+
 public:
 
 	UPawnMovementComponent* GetMovementComponent() const;
 	float GetDeltaYaw(float DeltaTime);
+
+	/** Temporarily pause rotation without unlocking the target. */
+	UFUNCTION(BlueprintCallable, Category = "Rotation")
+	void SetPaused(bool bInPaused);
+
+	/** Check if rotation is currently paused. */
+	UFUNCTION(BlueprintPure, Category = "Rotation")
+	bool IsPaused() const { return bPaused; }
+
+private:
+	bool bPaused = false;
 
 protected: /** Overrides */
 
