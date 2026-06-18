@@ -19,7 +19,7 @@ struct LOCKONTARGET_API FTargetSocketData
 
 	FTargetSocketData() = default;
 
-	FTargetSocketData(FName InSocket, bool bInIsMainSocket = false, float InWeight = 0.5f)
+	FTargetSocketData(FName InSocket, bool bInIsMainSocket = false, float InWeight = 1.f)
 		: Socket(InSocket)
 		, bIsMainSocket(bInIsMainSocket)
 		, Weight(InWeight)
@@ -35,7 +35,7 @@ struct LOCKONTARGET_API FTargetSocketData
 
 	/** Weight of this socket for target selection (0-1). For external use. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Socket", meta = (ClampMin = 0.f, ClampMax = 1.f))
-	float Weight = 0.5f;
+	float Weight = 1.f;
 };
 
 /**

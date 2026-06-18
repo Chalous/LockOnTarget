@@ -190,7 +190,7 @@ struct FTargetSocketData
 {
     FName Socket = NAME_None;       // 骨骼名称
     bool bIsMainSocket = false;     // 是否为主要锁定部位
-    float Weight = 0.5f;            // 骨骼权重 (0-1)
+    float Weight = 1.f;             // 骨骼权重 (0-1)
 };
 ```
 
@@ -200,7 +200,7 @@ struct FTargetSocketData
 |------|------|--------|------|
 | `Socket` | FName | None | 骨骼/Socket 名称（原有功能，编辑器中有下拉选择器） |
 | `bIsMainSocket` | bool | false | 标识该骨骼是否为角色的主要锁定部位，供外部逻辑使用 |
-| `Weight` | float (0-1) | 0.5 | 该骨骼在目标选择中的权重，供外部逻辑使用 |
+| `Weight` | float (0-1) | 1.0 | 该骨骼在目标选择中的权重，供外部逻辑使用 |
 
 ### API
 
@@ -230,6 +230,27 @@ for (const FTargetSocketData& Data : Target->GetSockets())
     
     // 根据 Weight 调整选择优先级
     float Priority = Data.Weight;
+}
+```
+
+### GetAllRelatedSockets
+
+`ULockOnTargetComponent::GetAllRelatedSockets` 返回与当前锁定相关的 Socket 数据数组。
+
+| 索引 | 内容 | 说明 |
+|------|------|------|
+| `[0]` | 被锁定的 Socket | 当前锁定的骨骼，含完整 `FTargetSocketData` 元数据 |
+| `[1]` | 最近的 Main Socket | 从锁定位置向数组开头方向扫描，找到的第一个 `bIsMainSocket=true` 的骨骼 |
+
+未锁定或锁定 Socket 前面没有 Main Socket 时，数组仅包含 `[0]`。
+
+```cpp
+TArray<FTargetSocketData> Related = LockOnComp->GetAllRelatedSockets();
+if (Related.Num() >= 2)
+{
+    // Related[0] — 锁定的骨骼（如 arm_r）
+    // Related[1] — 该骨骼所属的主身体部位（如 spine_02）
+    FName MainBody = Related[1].Socket;
 }
 ```
 

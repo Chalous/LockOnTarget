@@ -134,6 +134,38 @@ FVector ULockOnTargetComponent::GetCapturedFocusPointLocation() const
 	return IsTargetLocked() ? GetTargetComponent()->GetFocusPointLocation(this) : FVector(0.f);
 }
 
+TArray<FTargetSocketData> ULockOnTargetComponent::GetAllRelatedSockets() const
+{
+	TArray<FTargetSocketData> OutSockets;
+
+	if (!IsTargetLocked())
+	{
+		return OutSockets;
+	}
+
+	const FName CapturedSocket = GetCapturedSocket();
+	const TArray<FTargetSocketData>& Sockets = GetTargetComponent()->GetSockets();
+	const int32 CapturedIdx = Sockets.IndexOfByPredicate([CapturedSocket](const FTargetSocketData& Data) { return Data.Socket == CapturedSocket; });
+
+	if (CapturedIdx != INDEX_NONE)
+	{
+		// [0] = the captured socket with its metadata
+		OutSockets.Add(Sockets[CapturedIdx]);
+
+		// [1] = first Main Socket scanning backwards from CapturedIdx
+		for (int32 i = CapturedIdx - 1; i >= 0; --i)
+		{
+			if (Sockets[i].bIsMainSocket)
+			{
+				OutSockets.Add(Sockets[i]);
+				break;
+			}
+		}
+	}
+
+	return OutSockets;
+}
+
 /*******************************************************************************************/
 /********************************  Target Validation  **************************************/
 /*******************************************************************************************/

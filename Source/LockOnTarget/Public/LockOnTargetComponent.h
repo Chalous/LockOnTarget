@@ -150,6 +150,16 @@ public: /** Polls */
 	UFUNCTION(BlueprintPure, Category = "LockOnTargetComponent|Polls")
 	FVector GetCapturedFocusPointLocation() const;
 
+	/**
+	 * Returns related sockets for the current capture.
+	 * [0] = the captured socket.
+	 * [1] = the first Main Socket (bIsMainSocket) found by scanning backwards from the captured socket's
+	 *       position in TargetComponent's Sockets array. Narrows down to the main lock-on body part.
+	 * If no Main Socket is found before the captured socket, the array contains only the captured socket.
+	 */
+	UFUNCTION(BlueprintPure, Category = "LockOnTargetComponent|Polls")
+	TArray<FTargetSocketData> GetAllRelatedSockets() const;
+
 	/** Are we ready/able to capture Targets. Also checks for ownership and completeness of initialization. */
 	UFUNCTION(BlueprintPure, Category = "LockOnTargetComponent|Can Capture Target")
 	bool CanCaptureTarget() const;
