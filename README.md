@@ -167,6 +167,12 @@ Attack Rig 结束:
 ResetLockOnCorrectionStrength(0.12)
 ```
 
+### Target Distance Offset
+
+`UTargetComponent::TargetDistanceOffset`（float，默认值 0）提供目标距离偏移量，用于后期镜头效果。可在编辑器或蓝图中直接读写。
+
+---
+
 ## Usage
 1. 拓展使用
 <img width="528" height="189" alt="image" src="https://github.com/user-attachments/assets/d492bc58-6153-45f2-813b-733cacdae553" />

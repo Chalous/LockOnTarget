@@ -78,6 +78,10 @@ public: /** General */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General", meta = (ClampMin = 0.f, ClampMax = 1.f, Units = "x"))
 	float Priority;
 
+	/** Offset distance from the target for camera effects. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	float TargetDistanceOffset = 0.f;
+
 public: /** Focus Point */
 
 	/** Specifies the FocusPoint type. */
